@@ -1,0 +1,61 @@
+# --- Terraform local state & working dirs ---
+**/.terraform/
+**/.terraform/*
+
+# State files (NEVER commit real state)
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+
+# Sensitive var files
+terraform.tfvars
+*.tfvars
+*.auto.tfvars
+
+# Plan outputs
+*.plan
+*.tfplan
+plan.out
+plan.txt
+tfplan
+
+# Provider/plugin caches
+.terraform.lock.hcl
+!.keep
+
+# Local tooling / logs
+*.log
+*.tmp
+*.bak
+.DS_Store
+Thumbs.db
+
+# IDE/editor
+.vscode/
+.idea/
+*.iml
+
+# Python/Utility
+__pycache__/
+*.pyc
+
+# Build artifacts / exports
+*.zip
+*.tar
+*.tar.gz
+
+# Security: don’t commit credentials
+*.pem
+*.key
+*.pfx
+*.cer
+secrets.*.json
+.env
+.env.*

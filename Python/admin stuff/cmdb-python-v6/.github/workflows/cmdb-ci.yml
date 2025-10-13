@@ -1,0 +1,54 @@
+name: CMDB Python – CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-and-dryrun:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install deps (minimal for dry-run)
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyyaml jinja2 psutil rich dnspython
+      - name: Create minimal config with loopback subnet
+        run: |
+          cat > config.yaml <<'YAML'
+          discovery:
+            active_directory: { enabled: false }
+            azure:            { enabled: false }
+            vsphere:          { enabled: false }
+            subnet_scan:
+              enabled: true
+              targets: ["127.0.0.1/32"]
+              timeout_ms: 500
+              threads: 2
+              ping_only: true
+          collect:
+            windows: { enabled: false }
+            linux:   { enabled: false }
+            software:{ enabled: false }
+          dns: { enabled: true, servers: [], reverse_lookup: true }
+          export: { json: true, csv: true, html: true }
+          report: { title: "CI Test Report" }
+          static_targets: []
+          YAML
+      - name: Run dry-run with TUI
+        run: |
+          python cmdb_inventory.py --config config.yaml --out out --dry-run --tui
+          test -f out/inventory.json && test -f out/inventory.csv && test -f out/inventory.html
+      - name: View inventory in pager (non-interactive, just ensure script runs)
+        run: |
+          python inventory_viewer.py out/inventory.json <<<'q'
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cmdb-out
+          path: out/**

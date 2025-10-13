@@ -1,0 +1,157 @@
+name: CMDB Inventory
+
+on:
+  schedule:
+    - cron: "30 2 * * *"   # 02:30 UTC daily
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Run mode"
+        required: true
+        default: "full"
+        type: choice
+        options: ["full", "dry-run", "fast"]
+      subnet_scan:
+        description: "Enable subnet scan"
+        required: false
+        default: "true"
+        type: choice
+        options: ["true", "false"]
+      commit_results:
+        description: "Commit artifacts to data branch"
+        required: false
+        default: "false"
+        type: choice
+        options: ["true", "false"]
+
+env:
+  CONFIG_FILE: config.yaml
+  OUT_DIR: out
+  DISCOVERY_SUBNETS: ""   # optional CSV of CIDRs (e.g., "10.0.0.0/24,192.168.1.0/24")
+
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Hydrate config from file (repo) or secret
+        id: hydrate-config
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Prefer secret-provided YAML if present
+          if [ -n "${{ secrets.CMDB_CONFIG_YAML }}" ]; then
+            echo "Using config from secret CMDB_CONFIG_YAML"
+            printf '%s\n' "${{ secrets.CMDB_CONFIG_YAML }}" > "${CONFIG_FILE}"
+          elif [ -f "config.yaml" ]; then
+            echo "Using config.yaml in repo"
+            cp config.yaml "${CONFIG_FILE}"
+          elif [ -f "config.example.yaml" ]; then
+            echo "Using config.example.yaml in repo"
+            cp config.example.yaml "${CONFIG_FILE}"
+          else
+            echo "ERROR: No config.yaml or config.example.yaml found, and CMDB_CONFIG_YAML is empty." >&2
+            exit 1
+          fi
+
+          # Toggle subnet_scan.enabled via workflow input
+          if [ "${{ github.event.inputs.subnet_scan || 'true' }}" = "false" ]; then
+            python -c "import yaml; p='${{ env.CONFIG_FILE }}'; cfg=yaml.safe_load(open(p)) or {}; cfg.setdefault('discovery',{}).setdefault('subnet_scan',{})['enabled']=False; open(p,'w').write(yaml.safe_dump(cfg, sort_keys=False))"
+          fi
+
+          # Apply DISCOVERY_SUBNETS if provided (CSV -> list)
+          if [ -n "${DISCOVERY_SUBNETS}" ]; then
+            python -c "import os,yaml; p='${{ env.CONFIG_FILE }}'; cfg=yaml.safe_load(open(p)) or {}; nets=[s.strip() for s in os.environ.get('DISCOVERY_SUBNETS','').split(',') if s.strip()]; cfg.setdefault('discovery',{}).setdefault('subnet_scan',{})['targets']=nets; open(p,'w').write(yaml.safe_dump(cfg, sort_keys=False))"
+          fi
+
+      - name: Materialize SSH key (optional)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "${{ secrets.SSH_KEY_FILE }}" ]; then
+            mkdir -p ~/.ssh
+            printf '%s\n' "${{ secrets.SSH_KEY_FILE }}" > ~/.ssh/id_rsa
+            chmod 600 ~/.ssh/id_rsa
+            echo "SSH_KEY_FILE=${HOME}/.ssh/id_rsa" >> "${GITHUB_ENV}"
+          else
+            echo "No SSH_KEY_FILE secret set; skipping key materialization."
+          fi
+
+      - name: Run CMDB
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Export secrets as env just for this step (avoid step-level env: with expressions)
+          export AD_BIND_USER="${{ secrets.AD_BIND_USER }}"
+          export AD_BIND_PASSWORD="${{ secrets.AD_BIND_PASSWORD }}"
+          export AZURE_TENANT_ID="${{ secrets.AZURE_TENANT_ID }}"
+          export AZURE_CLIENT_ID="${{ secrets.AZURE_CLIENT_ID }}"
+          export AZURE_CLIENT_SECRET="${{ secrets.AZURE_CLIENT_SECRET }}"
+          export VSPHERE_USER="${{ secrets.VSPHERE_USER }}"
+          export VSPHERE_PASSWORD="${{ secrets.VSPHERE_PASSWORD }}"
+          export WINRM_USER="${{ secrets.WINRM_USER }}"
+          export WINRM_PASSWORD="${{ secrets.WINRM_PASSWORD }}"
+          export SSH_USER="${{ secrets.SSH_USER }}"
+          export SSH_PASSWORD="${{ secrets.SSH_PASSWORD }}"
+          # SSH_KEY_FILE may have been written by the previous step
+          : "${SSH_KEY_FILE:=}"
+
+          MODE="${{ github.event.inputs.mode || 'full' }}"
+          ARGS="-c ${CONFIG_FILE} -o ${OUT_DIR} --autotune"
+          case "${MODE}" in
+            "dry-run") ARGS="${ARGS} --dry-run" ;;
+            "fast")    ARGS="${ARGS} --fast" ;;
+            "full")    ;;
+            *) echo "Unknown mode: ${MODE}" >&2; exit 2 ;;
+          esac
+
+          echo "Executing: python cmdb_inventory.py ${ARGS}"
+          python cmdb_inventory.py ${ARGS}
+          ls -l "${OUT_DIR}" || true
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cmdb-inventory-${{ github.run_id }}
+          path: |
+            ${{ env.OUT_DIR }}/inventory.json
+            ${{ env.OUT_DIR }}/inventory.csv
+            ${{ env.OUT_DIR }}/inventory.html
+            ${{ env.OUT_DIR }}/inventory.db
+          retention-days: 14
+
+      - name: Commit results to data branch
+        if: ${{ github.event.inputs.commit_results == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          BRANCH="data-inventory"
+          git config user.name "cmdb-bot"
+          git config user.email "cmdb-bot@users.noreply.github.com"
+          git checkout -B "${BRANCH}"
+          TS="$(date -u +%Y/%m/%d)"
+          mkdir -p "data/${TS}"
+          cp -v "${OUT_DIR}/inventory."* "data/${TS}/"
+          git add -A
+          git commit -m "inventory: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          git push -f origin "${BRANCH}"

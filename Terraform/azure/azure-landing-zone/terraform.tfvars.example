@@ -1,0 +1,56 @@
+# Copy to terraform.tfvars and edit the ### fields
+
+location = "eastus2"
+org_name = "acme"
+env      = "dev"
+
+address_spaces = { hub="10.0.0.0/16", spoke="10.1.0.0/16" }
+
+subnets = {
+  hub = {
+    firewall     = "10.0.0.0/26"
+    shared       = "10.0.1.0/24"
+    azurebastion = "10.0.2.0/27"
+  }
+  spoke = {
+    ingress = "10.1.0.0/24"
+    app     = "10.1.16.0/20"
+    data    = "10.1.32.0/20"
+    private = "10.1.48.0/24"
+  }
+}
+
+enable_management_groups        = true
+enable_security_policies        = true
+enable_tenant_mfa               = false
+create_app_gateway              = true
+db_engine                       = "pg"
+vmss_instance_count             = 2
+
+policy_allowed_locations        = ["eastus2","centralus"]
+policy_required_tags            = { cost_center="1234", owner="platform-team", managed_by="terraform" }
+
+# Per-resource naming standards (regex by resource type)
+naming_library = {
+  "Microsoft.Network/virtualNetworks"                 = "^[a-z0-9-]{3,50}$"
+  "Microsoft.Network/virtualNetworks/subnets"         = "^[a-z0-9-]{3,50}$"
+  "Microsoft.Network/networkSecurityGroups"           = "^[a-z0-9-]{3,64}$"
+  "Microsoft.Compute/virtualMachineScaleSets"         = "^[a-z0-9-]{3,64}$"
+  "Microsoft.OperationalInsights/workspaces"          = "^[a-z0-9-]{4,63}$"
+  "Microsoft.DBforPostgreSQL/flexibleServers"         = "^[a-z0-9-]{3,63}$"
+  "Microsoft.Network/applicationGateways"             = "^[a-z0-9-]{3,80}$"
+  "Microsoft.Storage/storageAccounts"                 = "^[a-z0-9]{3,24}$"
+  "Microsoft.Resources/resourceGroups"                = "^[a-zA-Z0-9._()-]{1,90}$"
+  "Microsoft.KeyVault/vaults"                         = "^[a-z0-9-]{3,24}$"
+  "Microsoft.Network/publicIPAddresses"               = "^[a-z0-9-]{3,80}$"
+}
+
+enable_initiative_azure_monitor_vms = true
+enable_initiative_defender_plans    = false
+
+enable_nsgs    = true
+office_cidrs   = ["203.0.113.0/24"]
+
+# nsg_extra_rules = { ingress=[], app=[], data=[], private=[] }
+
+tags = { cost_center="1234", owner="platform-team", managed_by="terraform" }

@@ -1,0 +1,66 @@
+
+# config.example.yaml
+# Minimal example configuration for CMDB Python Toolkit
+# Copy this to config.yaml and customize as needed.
+
+discovery:
+  active_directory:
+    enabled: false
+    server: "ldaps://ad.example.local"
+    base_dn: "DC=example,DC=local"
+
+  azure:
+    enabled: false
+    subscriptions:
+      - "11111111-1111-1111-1111-111111111111"
+
+  vsphere:
+    enabled: false
+    server: "vcenter.example.local"
+
+  subnet_scan:
+    enabled: true
+    targets: ["10.0.0.0/24"]
+    ping_only: true
+
+collect:
+  windows:
+    enabled: true
+  linux:
+    enabled: true
+  software:
+    enabled: false
+
+features:
+  discovery:
+    ad: true
+    azure: true
+    vsphere: true
+    subnet_scan: true
+  enrichment:
+    dns: true
+    ad_ou: true
+    transforms: true
+  collection:
+    windows: true
+    linux: true
+
+fields:
+  include:
+    - host
+    - provider
+    - OS
+    - Version
+    - IPs
+    - environment
+    - ad_ou
+    - resolved_name
+  exclude: []
+
+export:
+  json: true
+  csv: true
+  html: true
+  sqlite:
+    enabled: true
+    file: "out/inventory.db"
