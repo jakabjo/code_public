@@ -317,7 +317,7 @@ terraform init
 terraform test -compact-warnings
 
 ---
-
+```
 ## Summary
 
 This landing zone repository provides a **repeatable, secure, governed, and automated Azure foundation** for multi-tenant enterprise environments. With policy enforcement, security defaults, CI/CD automation, and rollback strategy built-in, it forms the backbone of a robust cloud platform.
