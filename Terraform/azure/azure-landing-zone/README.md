@@ -1,6 +1,6 @@
-# Azure Landing Zone — Reusable Terraform Platform
+# Azure Landing Zone - Reusable Terraform Platform - Everything Including the Kitchen Sink
 
-This repository provides a **modular, production-ready Azure Landing Zone** that can be deployed across multiple tenants and subscriptions with minimal changes. It is designed for **enterprise platform engineering teams** to manage network, identity, security, policy, governance, and compute at scale — all via **Terraform + GitHub Actions**.
+This repository provides a **modular, production-ready Azure Landing Zone** that can be deployed across multiple tenants and subscriptions with minimal changes. It is designed for **enterprise platform engineering teams** to manage network, identity, security, policy, governance, and compute at scale - all via **Terraform + GitHub Actions**.
 
 It is:
 
@@ -301,7 +301,20 @@ vmss_name                  = "acme-dev-vmss"
 database_fqdn              = "acme-dev-pgxyz.postgres.database.azure.com"
 log_analytics_workspace_id = "/subscriptions/.../workspaces/acme-dev-law"
 management_group_root_id   = "/providers/Microsoft.Management/managementGroups/acme-dev-platform"
+
+---
+
 ```
+## Testing
+
+This configuration ships with **native Terraform tests** (Terraform ≥ 1.6). Tests are **plan-only** by default, so they run quickly and do not create cloud resources.
+
+### Run locally
+
+```bash
+cd Terraform/azure/azure-landing-zone
+terraform init
+terraform test -compact-warnings
 
 ---
 
