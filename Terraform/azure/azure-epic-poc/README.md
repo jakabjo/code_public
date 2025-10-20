@@ -91,5 +91,5 @@ epic-azure-poc/
 - Documentation demonstrates scalability, reliability, and cost transparency.
 
 ## Attribution
-This framework was developed by the **Azure Cloud Delivery Team** to support evaluation of Epic EHR workloads in Azure.
+This framework was developed by the **Jason J.** to support evaluation of Epic EHR workloads in Azure.
 It aligns with **Microsoft Cloud Adoption Framework**, **Azure Well‑Architected Framework**, and Epic reference guidance.
