@@ -8,6 +8,6 @@ enable_vpn      = false
 
 tags = {
   workload = "epic-poc"
-  owner    = "cleveland-clinic"
+  owner    = "healthcare provider"
   env      = "dev"
 }

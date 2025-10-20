@@ -1,10 +1,10 @@
 # Epic Proof of Concept (POC) – Microsoft Azure
 
 ## Overview
-This repository contains modular Terraform scripts to deploy a secure and compliant **Epic Proof of Concept (POC)** in **Microsoft Azure** for **Cleveland Clinic**.
+This repository contains modular Terraform scripts to deploy a secure and compliant **Epic Proof of Concept (POC)** in **Microsoft Azure**.
 The goal is to validate **Epic EHR infrastructure performance, scalability, and compliance** on Azure while maintaining **HIPAA** and **HITRUST** standards.
 
-This POC provides a representative simulation of Epic components such as **IRIS Cache**, **Hyperspace**, and **Interconnect**, enabling Cleveland Clinic’s teams to benchmark performance, evaluate costs, and verify compliance alignment before broader adoption.
+This POC provides a representative simulation of Epic components such as **IRIS Cache**, **Hyperspace**, and **Interconnect**, enabling healthcare provider teams to benchmark performance, evaluate costs, and verify compliance alignment before broader adoption.
 
 ## Objectives
 - Establish a secure **Azure landing zone** tailored for healthcare compliance.
@@ -68,7 +68,7 @@ epic-azure-poc/
 - Use Epic-approved test harnesses or Iometer-style tools to validate latency and throughput.
 
 ### Compliance
-- All resources adhere to **Cleveland Clinic** security and compliance baselines.
+- All resources adhere to security and compliance baselines.
 - Deployed services map to Microsoft’s **HIPAA** and **HITRUST** compliant offerings.
 - Use **synthetic** data only in the POC. No production PHI should be stored or transmitted.
 
@@ -91,5 +91,5 @@ epic-azure-poc/
 - Documentation demonstrates scalability, reliability, and cost transparency.
 
 ## Attribution
-This framework was developed for **Cleveland Clinic** by the **Azure Cloud Delivery Team** to support evaluation of Epic EHR workloads in Azure.
+This framework was developed by the **Azure Cloud Delivery Team** to support evaluation of Epic EHR workloads in Azure.
 It aligns with **Microsoft Cloud Adoption Framework**, **Azure Well‑Architected Framework**, and Epic reference guidance.
