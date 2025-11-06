@@ -90,7 +90,7 @@ This landing zone implements a **hub-and-spoke** model with governance and secur
 - **Storage:** Private Storage Accounts  
 - **Identity:** Conditional Access MFA policy with exclusions
 
-```
+``` 
 Internet ─▶ App Gateway ─▶ Ingress Subnet
                    │
                    ├─▶ App Subnet ─▶ NAT Gateway ─▶ Internet

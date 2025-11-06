@@ -1,6 +1,16 @@
 <#
+-------------------------------------------------------------------------------------------------------
 .SYNOPSIS
-  Lab-safe chirper. Plays a tone at random intervals. Transparent and opt-in.
+  This is a PowerShell script that plays a high-frequency chirp sound at random intervals. 
+  This script will also attenuate the system volume/mute state to ensure the chirp is audible. ;-)
+  Don't be a jerk and use this responsibly.
+
+.NOTES
+  File Name      : chirper.ps1
+  Author         : Jason Johnson
+  Prerequisite   : PowerShell V2.
+  Copyright 2024 - Jason Johnson
+  Use the companion batch script chirper.bat for easy set up on your target device.
 
 .PARAMETER FrequencyHz
   Base frequency for the chirp (Hz).
@@ -16,6 +26,7 @@
 
 .PARAMETER JitterHz
   +/- random jitter added to FrequencyHz each chirp (for variety).
+  --------------------------------------------------------------------------------------------------
 #>
 
 param(
@@ -97,7 +108,7 @@ function Enable-Speakers {
 }
 
 function Set-TaskSchedulerTask {
-  $action = New-ScheduledTaskAction -Execute "Powershell.exe" -Argument "-File `""C:\path\to\your\StealthChirpUnmute.ps1`"""
+  $action = New-ScheduledTaskAction -Execute "Powershell.exe" -Argument "-File `""C:\path\to\your\StealthChirpUnmute.ps1`""" # <---Change Me
   $trigger = New-ScheduledTaskTrigger -AtStartup
   $principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
   Register-ScheduledTask -Action $action -Trigger $trigger -Principal $principal -TaskName "StealthChirp" -Description "Plays a chirp sound at random intervals" -Force
@@ -120,7 +131,7 @@ try {
     Play-Chirp -Hz $hz -Ms $DurationMs -Vol $Volume
   }
 }
+# Uncomment the the following line to enable stop message, but where's the fun in that?
 catch {
-  # Remove the stop message
   # Write-Host "[Chirper] Stopped: $($_.Exception.Message)" -ForegroundColor Yellow
 }
