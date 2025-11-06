@@ -1,3 +1,22 @@
+# What it builds:
+
+  # VPC with two public subnets
+
+  # Internet gateway + default route
+
+  # ALB (HTTP :80)
+
+  # Auto Scaling Group in public subnets (instances serve a static page)
+
+# Notes
+
+  # No dynamic refs, no typed SSM params, no Conditions, no Secrets Manager, no RDS.
+
+  # Pass your own AMI ID (e.g., an Amazon Linux 2023 AMI) via parameter.
+
+  # UserData is a plain Base64 string (no intrinsics, no ${} expansion).
+
+
 AWSTemplateFormatVersion: '2010-09-09'
 Description: Composer-safe minimal 2-tier (ALB + ASG) to validate template ingestion.
 
