@@ -1,0 +1,323 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Simple 3-tier web app (ALB + EC2 app tier + RDS MySQL) across two AZs (long-form intrinsics).
+
+Parameters:
+  VpcCidr:
+    Type: String
+    Default: 10.0.0.0/16
+  PublicSubnetCidrs:
+    Type: List<String>
+    Default: 10.0.0.0/24,10.0.1.0/24
+  PrivateSubnetCidrs:
+    Type: List<String>
+    Default: 10.0.10.0/24,10.0.11.0/24
+  InstanceType:
+    Type: String
+    Default: t3.micro
+  DesiredCapacity:
+    Type: Number
+    Default: 2
+  MinSize:
+    Type: Number
+    Default: 2
+  MaxSize:
+    Type: Number
+    Default: 4
+  DBEngineVersion:
+    Type: String
+    Default: '8.0.35'
+  DBInstanceClass:
+    Type: String
+    Default: db.t3.micro
+  DBMultiAZ:
+    Type: String
+    AllowedValues: ['true','false']
+    Default: 'false'
+  DBAllocatedStorage:
+    Type: Number
+    Default: 20
+  AllowedCidrToAlb:
+    Type: String
+    Default: 0.0.0.0/0
+    Description: Who can reach ALB on port 80
+
+Mappings:
+  AmiParam:
+    AL2023: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64
+
+Conditions:
+  UseMultiAZ:
+    Fn::Equals: [ { Ref: DBMultiAZ }, 'true' ]
+
+Resources:
+
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: { Ref: VpcCidr }
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: { Fn::Sub: '${AWS::StackName}-vpc' }
+
+  IGW:
+    Type: AWS::EC2::InternetGateway
+
+  VPCGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: { Ref: VPC }
+      InternetGatewayId: { Ref: IGW }
+
+  PublicSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: { Ref: VPC }
+      AvailabilityZone:
+        Fn::Select: [ 0, { Fn::GetAZs: '' } ]
+      CidrBlock:
+        Fn::Select: [ 0, { Ref: PublicSubnetCidrs } ]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: { Fn::Sub: '${AWS::StackName}-public-a' }
+
+  PublicSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: { Ref: VPC }
+      AvailabilityZone:
+        Fn::Select: [ 1, { Fn::GetAZs: '' } ]
+      CidrBlock:
+        Fn::Select: [ 1, { Ref: PublicSubnetCidrs } ]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: { Fn::Sub: '${AWS::StackName}-public-b' }
+
+  PrivateSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: { Ref: VPC }
+      AvailabilityZone:
+        Fn::Select: [ 0, { Fn::GetAZs: '' } ]
+      CidrBlock:
+        Fn::Select: [ 0, { Ref: PrivateSubnetCidrs } ]
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: { Fn::Sub: '${AWS::StackName}-private-a' }
+
+  PrivateSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: { Ref: VPC }
+      AvailabilityZone:
+        Fn::Select: [ 1, { Fn::GetAZs: '' } ]
+      CidrBlock:
+        Fn::Select: [ 1, { Ref: PrivateSubnetCidrs } ]
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: { Fn::Sub: '${AWS::StackName}-private-b' }
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: { Ref: VPC }
+
+  PublicDefaultRoute:
+    Type: AWS::EC2::Route
+    DependsOn: VPCGatewayAttachment
+    Properties:
+      RouteTableId: { Ref: PublicRouteTable }
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: { Ref: IGW }
+
+  AssocPublicA:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: { Ref: PublicSubnetA }
+      RouteTableId: { Ref: PublicRouteTable }
+
+  AssocPublicB:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: { Ref: PublicSubnetB }
+      RouteTableId: { Ref: PublicRouteTable }
+
+  AlbSg:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: ALB SG
+      VpcId: { Ref: VPC }
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: { Ref: AllowedCidrToAlb }
+
+  AppSg:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: App tier SG
+      VpcId: { Ref: VPC }
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId: { Ref: AlbSg }
+
+  DbSg:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: DB SG
+      VpcId: { Ref: VPC }
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          SourceSecurityGroupId: { Ref: AppSg }
+
+  Alb:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Type: application
+      Scheme: internet-facing
+      Subnets: [ { Ref: PublicSubnetA }, { Ref: PublicSubnetB } ]
+      SecurityGroups: [ { Ref: AlbSg } ]
+
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      VpcId: { Ref: VPC }
+      Protocol: HTTP
+      Port: 80
+      TargetType: instance
+      HealthCheckPath: /
+
+  Listener80:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: { Ref: Alb }
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: { Ref: TargetGroup }
+
+  AppRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: ec2.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyName: ReadDbSecret
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [ 'secretsmanager:GetSecretValue' ]
+                Resource: { Ref: DbSecret }
+
+  AppInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles: [ { Ref: AppRole } ]
+
+  DbSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Description: Credentials for RDS MySQL
+      GenerateSecretString:
+        SecretStringTemplate:
+          Fn::Sub: '{"username": "appuser"}'
+        GenerateStringKey: password
+        ExcludeCharacters: "\"@/\\"
+        PasswordLength: 24
+
+  DbSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Private subnets for DB
+      SubnetIds: [ { Ref: PrivateSubnetA }, { Ref: PrivateSubnetB } ]
+
+  DBInstance:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Snapshot
+    UpdateReplacePolicy: Snapshot
+    Properties:
+      DBInstanceClass: { Ref: DBInstanceClass }
+      AllocatedStorage: { Ref: DBAllocatedStorage }
+      Engine: mysql
+      EngineVersion: { Ref: DBEngineVersion }
+      MasterUsername:
+        Fn::Sub: '{{resolve:secretsmanager:${DbSecret}::username}}'
+      MasterUserPassword:
+        Fn::Sub: '{{resolve:secretsmanager:${DbSecret}::password}}'
+      VPCSecurityGroups: [ { Ref: DbSg } ]
+      DBSubnetGroupName: { Ref: DbSubnetGroup }
+      MultiAZ: { Fn::If: [ UseMultiAZ, true, false ] }
+      StorageEncrypted: true
+      BackupRetentionPeriod: 7
+      PubliclyAccessible: false
+
+  AppLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateData:
+        IamInstanceProfile: { Name: { Ref: AppInstanceProfile } }
+        ImageId:
+          Fn::Sub: '{{resolve:ssm:${AmiParam.AL2023}}}'
+        InstanceType: { Ref: InstanceType }
+        NetworkInterfaces:
+          - DeviceIndex: 0
+            AssociatePublicIpAddress: false
+            Groups: [ { Ref: AppSg } ]
+        MetadataOptions:
+          HttpTokens: required
+        UserData:
+          Fn::Base64:
+            Fn::Sub: |
+              #!/bin/bash
+              echo "<h1>${AWS::StackName} 3-tier app</h1>" > /var/www/html/index.html
+              systemctl enable --now httpd || true
+
+  AppAsg:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      VPCZoneIdentifier: [ { Ref: PrivateSubnetA }, { Ref: PrivateSubnetB } ]
+      MinSize: { Ref: MinSize }
+      MaxSize: { Ref: MaxSize }
+      DesiredCapacity: { Ref: DesiredCapacity }
+      TargetGroupARNs: [ { Ref: TargetGroup } ]
+      LaunchTemplate:
+        LaunchTemplateId: { Ref: AppLaunchTemplate }
+        Version: { Fn::GetAtt: [ AppLaunchTemplate, LatestVersionNumber ] }
+      HealthCheckType: ELB
+      HealthCheckGracePeriod: 120
+    UpdatePolicy:
+      AutoScalingRollingUpdate:
+        MinInstancesInService: 1
+        MaxBatchSize: 1
+        PauseTime: PT5M
+
+Outputs:
+  LoadBalancerDNS:
+    Description: Public DNS of the ALB
+    Value: { Fn::GetAtt: [ Alb, DNSName ] }
+  VpcId:
+    Value: { Ref: VPC }
+  AppSecurityGroupId:
+    Value: { Ref: AppSg }
+  DbEndpoint:
+    Value: { Fn::GetAtt: [ DBInstance, Endpoint.Address ] }
+  DbSecretArn:
+    Value: { Ref: DbSecret }
